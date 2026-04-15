@@ -1,6 +1,6 @@
 const { useState, useRef, useEffect, useCallback } = React;
 
-const WEEK_THEME = { name: "COURAGE WEEK", sub: "Day 4 of 7", color: "#ff3c3c" };
+const ACCENT_COLOR = "#ff3c3c";
 const QUESTS = [
   { id: 1, title: "Touch the sky", desc: "Find the highest point you can safely reach. Stretch your arm up. Photo: your hand against open sky.", xp: 120, diff: "Medium", path: "A" },
   { id: 2, title: "Talk to a stranger", desc: "Have a real conversation — not just directions — with someone you've never met. Photo: you two together.", xp: 150, diff: "Hard", path: "B" },
@@ -601,7 +601,7 @@ function App() {
     if(!apiKey){setRoast("no API key configured.");return;}
     setGeneratingAI(true);
     try {
-      const res=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json","x-api-key":apiKey},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:800,messages:[{role:"user",content:`Generate 2 bold real-world daily quest ideas for COURAGE WEEK. Each must be doable, photo-verifiable, feel like a dare. Reply ONLY as JSON: [{"title":"...","desc":"..."},{"title":"...","desc":"..."}]`}]})});
+      const res=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json","x-api-key":apiKey},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:800,messages:[{role:"user",content:`Generate 2 bold real-world daily quest ideas for Free Will Quest. Each must be doable, photo-verifiable, feel like a dare. Reply ONLY as JSON: [{"title":"...","desc":"..."},{"title":"...","desc":"..."}]`}]})});
       const data=await res.json();
       const text=data.content?.find(b=>b.type==="text")?.text||"[]";
       const qs=JSON.parse(text.replace(/```json|```/g,"").trim());
@@ -638,7 +638,6 @@ function App() {
         {/* Header */}
         <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"1.25rem" }}>
           <div>
-            <div style={{ fontSize:11,fontWeight:900,letterSpacing:3,color:WEEK_THEME.color,marginBottom:2 }}>{WEEK_THEME.name} · {WEEK_THEME.sub}</div>
             <div style={{ fontSize:24,fontWeight:900,letterSpacing:-2,lineHeight:1 }}>FREE WILL<br/>QUEST</div>
           </div>
           <div style={{ display:"flex",flexDirection:"column",alignItems:"flex-end",gap:6 }}>
@@ -675,7 +674,7 @@ function App() {
         {/* Tabs */}
         <div style={{ display:"flex",gap:2,marginBottom:"1.25rem",borderBottom:"1px solid #1a1a1a" }}>
           {tabs.map(t=>(
-            <button key={t.id} onClick={()=>setTab(t.id)} style={{ background:"none",border:"none",padding:"7px 10px",fontSize:11,fontWeight:900,letterSpacing:2,color:tab===t.id?"#fff":"#444",borderBottom:tab===t.id?`2px solid ${WEEK_THEME.color}`:"2px solid transparent",cursor:"pointer",marginBottom:-1 }}>{t.label}</button>
+            <button key={t.id} onClick={()=>setTab(t.id)} style={{ background:"none",border:"none",padding:"7px 10px",fontSize:11,fontWeight:900,letterSpacing:2,color:tab===t.id?"#fff":"#444",borderBottom:tab===t.id?`2px solid ${ACCENT_COLOR}`:"2px solid transparent",cursor:"pointer",marginBottom:-1 }}>{t.label}</button>
           ))}
           <button onClick={()=>setShowShop(true)} style={{ marginLeft:"auto",background:"none",border:"1px solid #1a1a1a",borderRadius:999,padding:"4px 9px",fontSize:11,color:"#333",cursor:"pointer" }}>🛒</button>
         </div>
@@ -687,7 +686,7 @@ function App() {
 
             {phase==="blind"&&(
               <div style={{ background:"#0d0d0d",border:"1px solid #1a1a1a",borderRadius:12,padding:"1.25rem" }}>
-                <div style={{ fontSize:11,fontWeight:900,letterSpacing:3,color:WEEK_THEME.color,marginBottom:8 }}>TODAY'S DARE — PICK YOUR PATH</div>
+                <div style={{ fontSize:11,fontWeight:900,letterSpacing:3,color:ACCENT_COLOR,marginBottom:8 }}>TODAY'S DARE — PICK YOUR PATH</div>
                 <div style={{ fontSize:13,color:"#444",marginBottom:14,lineHeight:1.5 }}>Two quests. Scratch to reveal. You only do one.</div>
                 {QUESTS.map((q,i)=>(
                   <ScratchReveal key={q.id} quest={q} onReveal={()=>{const n=[...scratchDone];n[i]=true;setScratchDone(n);}} />
@@ -707,8 +706,8 @@ function App() {
 
             {phase==="chosen"&&chosenQuest&&(
               <div>
-                <div style={{ background:"#0d0d0d",border:`1px solid ${WEEK_THEME.color}33`,borderRadius:12,padding:"1.25rem",marginBottom:12 }}>
-                  <div style={{ fontSize:11,fontWeight:900,letterSpacing:3,color:WEEK_THEME.color,marginBottom:8 }}>PATH {chosenQuest.path} — YOUR DARE</div>
+                <div style={{ background:"#0d0d0d",border:`1px solid ${ACCENT_COLOR}33`,borderRadius:12,padding:"1.25rem",marginBottom:12 }}>
+                  <div style={{ fontSize:11,fontWeight:900,letterSpacing:3,color:ACCENT_COLOR,marginBottom:8 }}>PATH {chosenQuest.path} — YOUR DARE</div>
                   <div style={{ fontSize:22,fontWeight:900,letterSpacing:-1,marginBottom:10,lineHeight:1.1,textTransform:"uppercase" }}>{chosenQuest.title}</div>
                   <div style={{ fontSize:14,color:"#666",lineHeight:1.6,marginBottom:12 }}>{chosenQuest.desc}</div>
                   <div style={{ display:"flex",gap:10 }}>
@@ -730,7 +729,7 @@ function App() {
                 <img src={preview} alt="proof" style={{ width:"100%",borderRadius:10,marginBottom:10,maxHeight:260,objectFit:"cover",filter:"grayscale(20%)" }} />
                 <div style={{ display:"flex",gap:8 }}>
                   <button onClick={reset} style={{ flex:1,padding:"11px",background:"#111",border:"1px solid #222",color:"#666",borderRadius:8,fontSize:12,fontWeight:900,letterSpacing:2,cursor:"pointer" }}>RETAKE</button>
-                  <button onClick={verifyWithAI} style={{ flex:2,padding:"11px",background:WEEK_THEME.color,border:"none",color:"#fff",borderRadius:8,fontSize:13,fontWeight:900,letterSpacing:2,cursor:"pointer" }}>VERIFY →</button>
+                  <button onClick={verifyWithAI} style={{ flex:2,padding:"11px",background:ACCENT_COLOR,border:"none",color:"#fff",borderRadius:8,fontSize:13,fontWeight:900,letterSpacing:2,cursor:"pointer" }}>VERIFY →</button>
                 </div>
                 <div style={{ marginTop:8,fontSize:10,color:"#1a1a1a",textAlign:"center",letterSpacing:1 }}>ADMIN WILL REVIEW YOUR SUBMISSION</div>
               </div>
@@ -756,7 +755,7 @@ function App() {
               <div style={{ background:"#0d0505",border:"1px solid #ff3c3c33",borderRadius:12,padding:"1.25rem" }}>
                 <div style={{ fontSize:13,fontWeight:900,color:"#ff3c3c",marginBottom:6,letterSpacing:2 }}>NOPE.</div>
                 <div style={{ fontSize:14,color:"#555",marginBottom:8 }}>{aiResult.reason}</div>
-                {roast&&<div style={{ fontSize:13,color:"#ff9050",fontStyle:"italic",marginBottom:14,borderLeft:`2px solid ${WEEK_THEME.color}`,paddingLeft:12 }}>"{roast}"</div>}
+                {roast&&<div style={{ fontSize:13,color:"#ff9050",fontStyle:"italic",marginBottom:14,borderLeft:`2px solid ${ACCENT_COLOR}`,paddingLeft:12 }}>"{roast}"</div>}
                 <div style={{ display:"flex",gap:8 }}>
                   <button onClick={()=>setPhase("chosen")} style={{ flex:1,padding:"9px",background:"#111",border:"1px solid #222",color:"#fff",borderRadius:6,fontSize:11,fontWeight:900,letterSpacing:1,cursor:"pointer" }}>RETRY</button>
                   {profile.inventory.PHOENIX_FEATHER>0&&(
