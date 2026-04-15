@@ -1,0 +1,26 @@
+{
+  "name": "Free Will Quest",
+  "short_name": "FWQ",
+  "description": "Daily dares that break your apathy. Take photos, prove it, earn streaks.",
+  "start_url": "/index.html",
+  "display": "standalone",
+  "background_color": "#080808",
+  "theme_color": "#ff3c3c",
+  "orientation": "portrait-primary",
+  "scope": "/",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect width='192' height='192' fill='%23ff3c3c'/><text x='96' y='145' font-size='120' font-weight='900' fill='%23fff' text-anchor='middle'>🔥</text></svg>",
+      "sizes": "192x192",
+      "type": "image/svg+xml"
+    }
+  ],
+  "categories": ["lifestyle", "productivity"],
+  "screenshots": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 540 720'><rect width='540' height='720' fill='%23080808'/><text x='270' y='360' font-size='80' font-weight='900' fill='%23ff3c3c' text-anchor='middle'>FREE WILL QUEST</text></svg>",
+      "sizes": "540x720",
+      "type": "image/svg+xml"
+    }
+  ]
+}

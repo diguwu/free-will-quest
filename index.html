@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#ff3c3c">
+  <meta name="description" content="Daily dares that break your apathy. Take photos, prove it, earn streaks.">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="FWQ">
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect fill='%23ff3c3c' width='192' height='192'/><text x='96' y='145' font-size='120' font-weight='900' fill='%23fff' text-anchor='middle'>🔥</text></svg>">
+  <title>FREE WILL QUEST</title>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone@7/babel.min.js"></script>
+  <!-- Propeller Ads -->
+  <script async src="https://cdn.propellerads.com/js/pa.js"></script>
+  <script>
+    // Initialize Propeller Ads when page loads
+    window.addEventListener('load', function() {
+      if (typeof _pa !== 'undefined') {
+        _pa.trackEvent('PageView');
+      }
+    });
+  </script>
+  <script>
+    // Expose React globally before Babel processes JSX
+    window.React = React;
+    window.ReactDOM = ReactDOM;
+
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/fwq/service-worker.js')
+          .then(reg => console.log('Service Worker registered'))
+          .catch(err => console.log('Service Worker registration failed'));
+      });
+    }
+  </script>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel" src="app.jsx?v=2"></script>
+</body>
+</html>
