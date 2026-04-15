@@ -38,6 +38,7 @@ const ADMIN_PASSWORD = "500222";
 const defaultProfile = () => ({
   questXP: 0, makerXP: 0, streak: 0, currency: 0,
   completedQuests: 0, skippedQuests: 0, skipAdUsed: [],
+  activeQuestId: null, activeQuestStatus: "blind",
   lastActiveAt: Date.now(), streakFreezeUsed: [],
   inventory: { PHOENIX_FEATHER: 0, ROAST_INSURANCE: 0 },
   reboundUsedAt: null, reboundOfferExpiry: null, comebackDay: 0,
@@ -507,8 +508,8 @@ function App() {
   });
   const [adminReviewingId,setAdminReviewingId]=useState(null);
   const [tab,setTab]=useState("quest");
-  const [phase,setPhase]=useState("blind");
-  const [chosenQuest,setChosenQuest]=useState(null);
+  const [phase,setPhase]=useState(()=>loadProfile().activeQuestStatus||"blind");
+  const [chosenQuest,setChosenQuest]=useState(()=>QUESTS.find(q=>q.id===loadProfile().activeQuestId)||null);
   const [scratchDone,setScratchDone]=useState([false,false]);
   const [preview,setPreview]=useState(null);
   const [aiResult,setAiResult]=useState(null);
@@ -559,6 +560,11 @@ function App() {
 
   const triggerWin=()=>{ setConfetti(true); setShake(true); setTimeout(()=>setConfetti(false),3500); setTimeout(()=>setShake(false),600); };
   const pushFeedEntry=(entry)=>setFeed(prev=>[{id:Date.now(),user:"you",avatar:"YO",upvotes:0,time:"just now",isMe:true,...entry},...prev].slice(0,25));
+  const syncQuestState=(quest,status)=>{
+    setChosenQuest(quest);
+    setPhase(status);
+    setProfile(p=>({...p,activeQuestId:quest?.id??null,activeQuestStatus:status}));
+  };
 
   const handleFile=(e)=>{ const f=e.target.files[0]; if(!f)return; const r=new FileReader(); r.onload=ev=>{setPreview(ev.target.result);setPhase("uploading");}; r.readAsDataURL(f); };
 
@@ -574,9 +580,8 @@ function App() {
 
     setAiResult({verified:true,reason:"Your quest was approved by admin! Well done.",roast:roast||"Approved by admin!"});
     setRoast(roast||"Nice work!");
-    setPhase("done");
     setAdminReviewingId(null);
-    setChosenQuest({ title: submission.questTitle, xp: submission.questXP, path: submission.questPath, desc: submission.questDesc, diff: submission.questDiff });
+    syncQuestState({ id: submission.questId||submission.id, title: submission.questTitle, xp: submission.questXP, path: submission.questPath, desc: submission.questDesc, diff: submission.questDiff }, "done");
     pushFeedEntry({ verified:true, status:"completed", title:submission.questTitle, xp:submission.questXP, path:submission.questPath, streak:newStreak });
     triggerWin();
     checkMilestone(newStreak);
@@ -590,12 +595,12 @@ function App() {
 
     setAiResult({verified:false,reason:"Admin said this doesn't show quest completion.",roast:roast||"Doesn't show the quest completion"});
     setRoast(roast||"Doesn't look right to admin");
-    setPhase("failed");
+    syncQuestState(chosenQuest,"failed");
     setAdminReviewingId(null);
   };
 
   const doVerify=useCallback(async()=>{
-    if(!apiKey){setRoast("no API key configured. check settings.");setPhase("failed");return;}
+    if(!apiKey){setRoast("no API key configured. check settings.");syncQuestState(chosenQuest,"failed");return;}
     setPhase("verifying");
     const hasIns=profile.inventory.ROAST_INSURANCE>0;
     try {
@@ -616,13 +621,13 @@ function App() {
         const newStreak=profile.streak+1;
         setProfile(p=>({ ...p,questXP:p.questXP+chosenQuest.xp,completedQuests:p.completedQuests+1,streak:newStreak,lastActiveAt:Date.now(), ...(hasIns?{inventory:{...p.inventory,ROAST_INSURANCE:p.inventory.ROAST_INSURANCE-1}}:{}) }));
         setAiResult(parsed); setRoast(hasIns?"🛡️ Roast Insurance activated. You're safe — this time.":parsed.roast);
-        setPhase("done"); pushFeedEntry({ verified:true, status:"completed", title:chosenQuest.title, xp:chosenQuest.xp, path:chosenQuest.path, streak:newStreak });
+        syncQuestState(chosenQuest,"done"); pushFeedEntry({ verified:true, status:"completed", title:chosenQuest.title, xp:chosenQuest.xp, path:chosenQuest.path, streak:newStreak });
         triggerWin(); checkMilestone(newStreak);
         setTimeout(()=>setShowNotify(true),2000);
       } else {
-        setAiResult(parsed); setRoast(hasIns?"🛡️ Roast blocked. Still failed though.":parsed.roast); setPhase("failed");
+        setAiResult(parsed); setRoast(hasIns?"🛡️ Roast blocked. Still failed though.":parsed.roast); syncQuestState(chosenQuest,"failed");
       }
-    } catch(e) { setAiResult({verified:false,reason:"Connection failed: "+e.message}); setRoast("couldn't even connect. bold strategy."); setPhase("failed"); }
+    } catch(e) { setAiResult({verified:false,reason:"Connection failed: "+e.message}); setRoast("couldn't even connect. bold strategy."); syncQuestState(chosenQuest,"failed"); }
   },[preview,chosenQuest,profile,apiKey]);
 
   useEffect(()=>{
@@ -645,26 +650,24 @@ function App() {
     } catch {} setGeneratingAI(false);
   };
 
-  const reset=()=>{ setPhase("blind");setChosenQuest(null);setPreview(null);setAiResult(null);setRoast(null);setScratchDone([false,false]);setDiffVote(null);setPathRevealed(false); };
-  const retakeUpload=()=>{ setPreview(null);setAiResult(null);setRoast(null);setPhase("chosen"); };
+  const reset=()=>{ setPreview(null);setAiResult(null);setRoast(null);setScratchDone([false,false]);setDiffVote(null);setPathRevealed(false);syncQuestState(null,"blind"); };
+  const retakeUpload=()=>{ setPreview(null);setAiResult(null);setRoast(null);syncQuestState(chosenQuest,"chosen"); };
   const bypassQuest=()=>{
     if(!chosenQuest||!skipCanUse)return;
-    const nextQuest=QUESTS.find(q=>q.id!==chosenQuest.id);
-    setProfile(p=>({...p,skippedQuests:p.skippedQuests+1,skipAdUsed:[...(p.skipAdUsed||[]),Date.now()]}));
+    setProfile(p=>({...p,skippedQuests:p.skippedQuests+1,skipAdUsed:[...(p.skipAdUsed||[]),Date.now()],lastActiveAt:Date.now()}));
     pushFeedEntry({ verified:false, status:"bypassed", title:chosenQuest.title, xp:0, path:chosenQuest.path });
     setPreview(null);
     setAiResult(null);
     setRoast(null);
-    setChosenQuest(nextQuest||null);
-    setPhase(nextQuest?"chosen":"blind");
+    syncQuestState(chosenQuest,"bypassed");
   };
   const verifyWithAI=()=>{ 
     // Submit to admin review queue instead of AI
-    const submission={id:Date.now(),questTitle:chosenQuest.title,questDesc:chosenQuest.desc,questXP:chosenQuest.xp,questPath:chosenQuest.path,questDiff:chosenQuest.diff,photoBase64:preview,status:"pending",submittedAt:Date.now()};
+    const submission={id:Date.now(),questId:chosenQuest.id,questTitle:chosenQuest.title,questDesc:chosenQuest.desc,questXP:chosenQuest.xp,questPath:chosenQuest.path,questDiff:chosenQuest.diff,photoBase64:preview,status:"pending",submittedAt:Date.now()};
     const updated=[...pendingSubmissions,submission];
     setPendingSubmissions(updated);
     localStorage.setItem(PENDING_SUBMISSIONS_KEY,JSON.stringify(updated));
-    setPhase("submitted");
+    syncQuestState(chosenQuest,"submitted");
   };
   const tabs=adminAuthenticated?[{id:"quest",label:"TODAY"},{id:"lab",label:"LAB"},{id:"community",label:"FEED"},{id:"leaderboard",label:"RANKS"},{id:"admin",label:"ADMIN"}]:[{id:"quest",label:"TODAY"},{id:"lab",label:"LAB"},{id:"community",label:"FEED"},{id:"leaderboard",label:"RANKS"}];
 
@@ -744,7 +747,7 @@ function App() {
                     <div style={{ fontSize:11,fontWeight:900,letterSpacing:2,color:"#444",marginBottom:10 }}>WHICH ONE?</div>
                     <div style={{ display:"flex",gap:8 }}>
                       {QUESTS.map(q=>(
-                        <button key={q.id} onClick={()=>{setChosenQuest(q);setPhase("chosen");}} style={{ flex:1,padding:"12px",background:"#111",border:"1px solid #2a2a2a",borderRadius:8,color:"#fff",fontSize:13,fontWeight:900,cursor:"pointer",letterSpacing:1 }}>PATH {q.path}</button>
+                        <button key={q.id} onClick={()=>syncQuestState(q,"chosen")} style={{ flex:1,padding:"12px",background:"#111",border:"1px solid #2a2a2a",borderRadius:8,color:"#fff",fontSize:13,fontWeight:900,cursor:"pointer",letterSpacing:1 }}>PATH {q.path}</button>
                       ))}
                     </div>
                   </div>
@@ -802,7 +805,14 @@ function App() {
                 <div style={{ fontSize:24,marginBottom:12 }}>✅</div>
                 <div style={{ fontSize:18,fontWeight:900,color:"#00ff88",marginBottom:8,letterSpacing:-1 }}>SUBMITTED!</div>
                 <div style={{ fontSize:13,color:"#555",marginBottom:16,lineHeight:1.6 }}>Your photo is in the admin review queue. You'll see the result here once admin reviews it.</div>
-                <button onClick={()=>{reset();setTab("quest");}} style={{ padding:"10px 20px",background:"#111",border:"1px solid #222",color:"#fff",borderRadius:8,fontSize:12,fontWeight:900,cursor:"pointer" }}>BACK HOME</button>
+              </div>
+            )}
+
+            {phase==="bypassed"&&chosenQuest&&(
+              <div style={{ background:"#120808",border:"1px solid #ff3c3c33",borderRadius:12,padding:"1.25rem",textAlign:"center" }}>
+                <div style={{ fontSize:18,fontWeight:900,color:"#ff9050",marginBottom:8,letterSpacing:-1 }}>QUEST BYPASSED</div>
+                <div style={{ fontSize:13,color:"#777",marginBottom:10 }}>PATH {chosenQuest.path} stays locked till reset.</div>
+                <div style={{ fontSize:13,color:"#ff9050",lineHeight:1.6 }}>bypassed like a pussy that you ARE</div>
               </div>
             )}
 
