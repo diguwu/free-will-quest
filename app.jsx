@@ -511,10 +511,7 @@ function App() {
   const [labStep,setLabStep]=useState("vote");
   const [lbTab,setLbTab]=useState("completers");
   const [generatingAI,setGeneratingAI]=useState(false);
-  const [feed,setFeed]=useState([
-    {id:1,user:"aryan_k",avatar:"AK",upvotes:34,verified:true,time:"2h ago",path:"A"},
-    {id:2,user:"priya.m",avatar:"PM",upvotes:21,verified:true,time:"3h ago",path:"B"},
-  ]);
+  const [feed,setFeed]=useState([]);
   const [diffVote,setDiffVote]=useState(null);
   const [pathRevealed,setPathRevealed]=useState(false);
   const fileRef=useRef();
@@ -848,6 +845,12 @@ function App() {
         {tab==="community"&&(
           <div>
             <BannerAd />
+            {!feed.length&&(
+              <div style={{ background:"#0d0d0d",border:"1px solid #1a1a1a",borderRadius:10,padding:"1rem 1.1rem",marginBottom:8,textAlign:"center" }}>
+                <div style={{ fontSize:13,fontWeight:900,color:"#666",marginBottom:4 }}>No posts yet</div>
+                <div style={{ fontSize:11,color:"#333",letterSpacing:1 }}>Complete a quest and your verified post will show up here.</div>
+              </div>
+            )}
             {feed.map(f=>(
               <div key={f.id} style={{ background:"#0d0d0d",border:"1px solid #1a1a1a",borderRadius:10,padding:"0.9rem 1.1rem",marginBottom:8,display:"flex",alignItems:"center",gap:12 }}>
                 <div style={{ width:36,height:36,borderRadius:"50%",background:"#1a1a1a",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:900,color:"#444",flexShrink:0 }}>{f.avatar}</div>
@@ -883,17 +886,10 @@ function App() {
                 <button key={s} onClick={()=>setLbTab(s)} style={{ flex:1,padding:"9px",background:lbTab===s?"#1a1a1a":"none",border:lbTab===s?"1px solid #333":"1px solid #111",color:lbTab===s?"#fff":"#444",borderRadius:6,fontSize:11,fontWeight:900,letterSpacing:2,cursor:"pointer",textTransform:"uppercase" }}>{s==="completers"?"QUESTERS":"MAKERS"}</button>
               ))}
             </div>
-            {[...(lbTab==="completers"?[
-              {rank:1,user:"aryan_k",val:3420,sub:"14D STREAK"},
-              {rank:2,user:"priya.m",val:2980,sub:"11D STREAK"},
-              {rank:3,user:"sam_t",val:2100,sub:"7D STREAK"},
-              {rank:4,user:"you",val:profile.questXP,sub:`${profile.streak}D STREAK`,isMe:true},
-            ]:[
-              {rank:1,user:"priya.m",val:980,sub:"6 QUESTS"},
-              {rank:2,user:"sam_t",val:720,sub:"4 QUESTS"},
-              {rank:3,user:"zara.n",val:510,sub:"3 QUESTS"},
-              {rank:4,user:"you",val:profile.makerXP,sub:`${candidates.filter(c=>c.isMe).length} QUESTS`,isMe:true},
-            ])].map(u=>(
+            {[(lbTab==="completers"
+              ? {rank:1,user:"you",val:profile.questXP,sub:`${profile.streak}D STREAK`,isMe:true}
+              : {rank:1,user:"you",val:profile.makerXP,sub:`${candidates.filter(c=>c.isMe).length} QUESTS`,isMe:true}
+            )].map(u=>(
               <div key={u.rank} style={{ background:u.isMe?"#0a0d0f":"#0d0d0d",border:u.isMe?"1px solid #ffffff11":"1px solid #1a1a1a",borderRadius:10,padding:"0.9rem 1.1rem",marginBottom:8,display:"flex",alignItems:"center",gap:12 }}>
                 <div style={{ width:22,fontSize:14,fontWeight:900,color:u.rank===1?"#ffe600":"#222",textAlign:"center" }}>{u.rank}</div>
                 <div style={{ flex:1 }}>
