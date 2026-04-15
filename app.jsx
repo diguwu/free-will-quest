@@ -30,12 +30,14 @@ const COMEBACK_QUESTS = [
 const STORAGE_KEY = "fwq_profile_v1";
 const API_KEY_STORAGE = "fwq_api_key";
 const PENDING_SUBMISSIONS_KEY = "fwq_pending_submissions_v1";
+const FEED_STORAGE_KEY = "fwq_feed_v1";
 const ADMIN_AUTH_KEY = "fwq_admin_authenticated";
 const ADMIN_USERNAME = "admin";
 const ADMIN_PASSWORD = "500222";
 
 const defaultProfile = () => ({
-  questXP: 0, makerXP: 0, streak: 0, currency: 50,
+  questXP: 0, makerXP: 0, streak: 0, currency: 0,
+  completedQuests: 0, skippedQuests: 0, skipAdUsed: [],
   lastActiveAt: Date.now(), streakFreezeUsed: [],
   inventory: { PHOENIX_FEATHER: 0, ROAST_INSURANCE: 0 },
   reboundUsedAt: null, reboundOfferExpiry: null, comebackDay: 0,
@@ -44,11 +46,28 @@ const defaultProfile = () => ({
 
 const loadProfile = () => {
   try {
-    const raw = window.storage && window.storage.get
-      ? null // handled async below
-      : null;
-    return defaultProfile();
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return defaultProfile();
+    const parsed = JSON.parse(raw);
+    return {
+      ...defaultProfile(),
+      ...parsed,
+      inventory: {
+        ...defaultProfile().inventory,
+        ...(parsed.inventory || {}),
+      },
+      streakFreezeUsed: parsed.streakFreezeUsed || [],
+      skipAdUsed: parsed.skipAdUsed || [],
+      badges: parsed.badges || [],
+    };
   } catch { return defaultProfile(); }
+};
+
+const loadFeed = () => {
+  try {
+    const raw = localStorage.getItem(FEED_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch { return []; }
 };
 
 // ── CONFETTI ──────────────────────────────────────────────────────────────
@@ -172,7 +191,7 @@ function AdInterstitial({ onDone }) {
           <div style={{ fontSize:11,color:"#222" }}>Google AdSense / AdMob</div>
         </div>
       </div>
-      <div style={{ marginTop:24,fontSize:12,color:"#444",letterSpacing:2 }}>AI ROAST LOADING IN {secs}s</div>
+      <div style={{ marginTop:24,fontSize:12,color:"#444",letterSpacing:2 }}>AD ENDS IN {secs}s</div>
       {secs===0&&<button onClick={onDone} style={{ marginTop:12,padding:"8px 20px",background:"#ff3c3c",border:"none",color:"#fff",borderRadius:6,fontSize:12,fontWeight:900,cursor:"pointer" }}>CONTINUE →</button>}
     </div>
   );
@@ -477,7 +496,7 @@ function TomorrowTeaser() {
 // ── MAIN APP ──────────────────────────────────────────────────────────────
 function App() {
   const [onboarded,setOnboarded]=useState(false);
-  const [profile,setProfile]=useState(defaultProfile);
+  const [profile,setProfile]=useState(loadProfile);
   const [apiKey,setApiKey]=useState(()=>localStorage.getItem(API_KEY_STORAGE)||"");
   const [showSettings,setShowSettings]=useState(false);
   const [adminAuthenticated,setAdminAuthenticated]=useState(()=>localStorage.getItem(ADMIN_AUTH_KEY)==="true");
@@ -498,6 +517,7 @@ function App() {
   const [shake,setShake]=useState(false);
   const [showAd,setShowAd]=useState(false);
   const [adDone,setAdDone]=useState(false);
+  const [adMode,setAdMode]=useState(null);
   const [showShop,setShowShop]=useState(false);
   const [showRebound,setShowRebound]=useState(false);
   const [showNotify,setShowNotify]=useState(false);
@@ -511,16 +531,26 @@ function App() {
   const [labStep,setLabStep]=useState("vote");
   const [lbTab,setLbTab]=useState("completers");
   const [generatingAI,setGeneratingAI]=useState(false);
-  const [feed,setFeed]=useState([]);
+  const [feed,setFeed]=useState(loadFeed);
   const [diffVote,setDiffVote]=useState(null);
   const [pathRevealed,setPathRevealed]=useState(false);
   const fileRef=useRef();
   const [,tick]=useState(0);
   useEffect(()=>{ const t=setInterval(()=>tick(n=>n+1),1000); return()=>clearInterval(t); },[]);
+  useEffect(()=>{ localStorage.setItem(STORAGE_KEY, JSON.stringify(profile)); },[profile]);
+  useEffect(()=>{ localStorage.setItem(FEED_STORAGE_KEY, JSON.stringify(feed)); },[feed]);
 
   const freeze=useStreakFreezeLogic(profile,setProfile);
   const rebound=useReboundLogic(profile,setProfile);
   const streakBroken=(Date.now()-profile.lastActiveAt)>24*3600000&&profile.streak>0;
+  const skipWindowStart=Date.now()-3*24*3600000;
+  const recentSkipUses=(profile.skipAdUsed||[]).filter(t=>t>skipWindowStart);
+  const skipCanUse=recentSkipUses.length<2;
+  const skipNextIn=skipCanUse?0:Math.max(0,recentSkipUses[0]+3*24*3600000-Date.now());
+  const fmtCountdown=(ms)=>{
+    const h=Math.floor(ms/3600000),m=Math.floor((ms%3600000)/60000);
+    return `${h}h ${m}m`;
+  };
 
   const checkMilestone=(newStreak)=>{
     const m=MILESTONES.find(m=>m.days===newStreak&&!profile.badges.includes(m.days));
@@ -528,6 +558,7 @@ function App() {
   };
 
   const triggerWin=()=>{ setConfetti(true); setShake(true); setTimeout(()=>setConfetti(false),3500); setTimeout(()=>setShake(false),600); };
+  const pushFeedEntry=(entry)=>setFeed(prev=>[{id:Date.now(),user:"you",avatar:"YO",upvotes:0,time:"just now",isMe:true,...entry},...prev].slice(0,25));
 
   const handleFile=(e)=>{ const f=e.target.files[0]; if(!f)return; const r=new FileReader(); r.onload=ev=>{setPreview(ev.target.result);setPhase("uploading");}; r.readAsDataURL(f); };
 
@@ -539,12 +570,14 @@ function App() {
 
     // Give user rewards
     const newStreak=profile.streak+1;
-    setProfile(p=>({...p,questXP:p.questXP+chosenQuest.xp,streak:newStreak,lastActiveAt:Date.now(),currency:p.currency+Math.floor(chosenQuest.xp/10)}));
+    setProfile(p=>({...p,questXP:p.questXP+submission.questXP,completedQuests:p.completedQuests+1,streak:newStreak,lastActiveAt:Date.now()}));
 
     setAiResult({verified:true,reason:"Your quest was approved by admin! Well done.",roast:roast||"Approved by admin!"});
     setRoast(roast||"Nice work!");
     setPhase("done");
     setAdminReviewingId(null);
+    setChosenQuest({ title: submission.questTitle, xp: submission.questXP, path: submission.questPath, desc: submission.questDesc, diff: submission.questDiff });
+    pushFeedEntry({ verified:true, status:"completed", title:submission.questTitle, xp:submission.questXP, path:submission.questPath, streak:newStreak });
     triggerWin();
     checkMilestone(newStreak);
   };
@@ -581,9 +614,9 @@ function App() {
       const parsed=JSON.parse(text.replace(/```json|```/g,"").trim());
       if(parsed.verified){
         const newStreak=profile.streak+1;
-        setProfile(p=>({ ...p,questXP:p.questXP+chosenQuest.xp,streak:newStreak,lastActiveAt:Date.now(),currency:p.currency+Math.floor(chosenQuest.xp/10), ...(hasIns?{inventory:{...p.inventory,ROAST_INSURANCE:p.inventory.ROAST_INSURANCE-1}}:{}) }));
+        setProfile(p=>({ ...p,questXP:p.questXP+chosenQuest.xp,completedQuests:p.completedQuests+1,streak:newStreak,lastActiveAt:Date.now(), ...(hasIns?{inventory:{...p.inventory,ROAST_INSURANCE:p.inventory.ROAST_INSURANCE-1}}:{}) }));
         setAiResult(parsed); setRoast(hasIns?"🛡️ Roast Insurance activated. You're safe — this time.":parsed.roast);
-        setPhase("done"); setFeed(prev=>[{id:Date.now(),user:"you",avatar:"YO",upvotes:0,verified:true,time:"just now",path:chosenQuest.path,isMe:true},...prev]);
+        setPhase("done"); pushFeedEntry({ verified:true, status:"completed", title:chosenQuest.title, xp:chosenQuest.xp, path:chosenQuest.path, streak:newStreak });
         triggerWin(); checkMilestone(newStreak);
         setTimeout(()=>setShowNotify(true),2000);
       } else {
@@ -592,7 +625,13 @@ function App() {
     } catch(e) { setAiResult({verified:false,reason:"Connection failed: "+e.message}); setRoast("couldn't even connect. bold strategy."); setPhase("failed"); }
   },[preview,chosenQuest,profile,apiKey]);
 
-  useEffect(()=>{ if(adDone){setAdDone(false);doVerify();} },[adDone,doVerify]);
+  useEffect(()=>{
+    if(!adDone)return;
+    setAdDone(false);
+    if(adMode==="verify") doVerify();
+    if(adMode==="bypass") bypassQuest();
+    setAdMode(null);
+  },[adDone,adMode,doVerify]);
 
   const generateAI=async()=>{
     if(!apiKey){setRoast("no API key configured.");return;}
@@ -607,9 +646,21 @@ function App() {
   };
 
   const reset=()=>{ setPhase("blind");setChosenQuest(null);setPreview(null);setAiResult(null);setRoast(null);setScratchDone([false,false]);setDiffVote(null);setPathRevealed(false); };
+  const retakeUpload=()=>{ setPreview(null);setAiResult(null);setRoast(null);setPhase("chosen"); };
+  const bypassQuest=()=>{
+    if(!chosenQuest||!skipCanUse)return;
+    const nextQuest=QUESTS.find(q=>q.id!==chosenQuest.id);
+    setProfile(p=>({...p,skippedQuests:p.skippedQuests+1,skipAdUsed:[...(p.skipAdUsed||[]),Date.now()]}));
+    pushFeedEntry({ verified:false, status:"bypassed", title:chosenQuest.title, xp:0, path:chosenQuest.path });
+    setPreview(null);
+    setAiResult(null);
+    setRoast(null);
+    setChosenQuest(nextQuest||null);
+    setPhase(nextQuest?"chosen":"blind");
+  };
   const verifyWithAI=()=>{ 
     // Submit to admin review queue instead of AI
-    const submission={id:Date.now(),questTitle:chosenQuest.title,photoBase64:preview,status:"pending",timestamp:Date.now()};
+    const submission={id:Date.now(),questTitle:chosenQuest.title,questDesc:chosenQuest.desc,questXP:chosenQuest.xp,questPath:chosenQuest.path,questDiff:chosenQuest.diff,photoBase64:preview,status:"pending",submittedAt:Date.now()};
     const updated=[...pendingSubmissions,submission];
     setPendingSubmissions(updated);
     localStorage.setItem(PENDING_SUBMISSIONS_KEY,JSON.stringify(updated));
@@ -713,6 +764,13 @@ function App() {
                     {profile.inventory.ROAST_INSURANCE>0&&<span style={{ fontSize:11,color:"#555",letterSpacing:1 }}>🛡️ INSURED</span>}
                   </div>
                 </div>
+                <div style={{ background:"#0a0a0a",border:"1px solid #1a1a1a",borderRadius:10,padding:"0.9rem 1rem",marginBottom:12,display:"flex",justifyContent:"space-between",alignItems:"center",gap:10 }}>
+                  <div>
+                    <div style={{ fontSize:10,fontWeight:900,letterSpacing:2,color:"#333",marginBottom:4 }}>BYPASS QUEST</div>
+                    <div style={{ fontSize:12,color:"#555" }}>{skipCanUse?`${2-recentSkipUses.length} of 2 skips left in 3 days`:`next skip in ${fmtCountdown(skipNextIn)}`}</div>
+                  </div>
+                  <button onClick={()=>{setAdMode("bypass");setShowAd(true);}} disabled={!skipCanUse} style={{ padding:"9px 14px",background:skipCanUse?"#111":"#0a0a0a",border:`1px solid ${skipCanUse?"#333":"#111"}`,color:skipCanUse?"#fff":"#222",borderRadius:8,fontSize:11,fontWeight:900,letterSpacing:1,cursor:skipCanUse?"pointer":"not-allowed" }}>WATCH AD</button>
+                </div>
                 <div onClick={()=>fileRef.current.click()} style={{ border:"1px dashed #1a1a1a",borderRadius:10,padding:"2rem 1rem",textAlign:"center",cursor:"pointer",background:"#0a0a0a" }}>
                   <div style={{ fontSize:12,color:"#2a2a2a",marginBottom:8,letterSpacing:1 }}>UPLOAD PROOF PHOTO</div>
                   <button style={{ background:"#1a1a1a",border:"1px solid #333",color:"#fff",padding:"9px 22px",borderRadius:6,fontSize:12,fontWeight:900,letterSpacing:2,cursor:"pointer" }}>CHOOSE</button>
@@ -725,7 +783,7 @@ function App() {
               <div>
                 <img src={preview} alt="proof" style={{ width:"100%",borderRadius:10,marginBottom:10,maxHeight:260,objectFit:"cover",filter:"grayscale(20%)" }} />
                 <div style={{ display:"flex",gap:8 }}>
-                  <button onClick={reset} style={{ flex:1,padding:"11px",background:"#111",border:"1px solid #222",color:"#666",borderRadius:8,fontSize:12,fontWeight:900,letterSpacing:2,cursor:"pointer" }}>RETAKE</button>
+                  <button onClick={retakeUpload} style={{ flex:1,padding:"11px",background:"#111",border:"1px solid #222",color:"#666",borderRadius:8,fontSize:12,fontWeight:900,letterSpacing:2,cursor:"pointer" }}>RETAKE</button>
                   <button onClick={verifyWithAI} style={{ flex:2,padding:"11px",background:ACCENT_COLOR,border:"none",color:"#fff",borderRadius:8,fontSize:13,fontWeight:900,letterSpacing:2,cursor:"pointer" }}>VERIFY →</button>
                 </div>
                 <div style={{ marginTop:8,fontSize:10,color:"#1a1a1a",textAlign:"center",letterSpacing:1 }}>ADMIN WILL REVIEW YOUR SUBMISSION</div>
@@ -770,7 +828,6 @@ function App() {
                   {roast&&<div style={{ fontSize:13,color:"#555",fontStyle:"italic",marginBottom:12,borderLeft:"2px solid #1a1a1a",paddingLeft:12 }}>"{roast}"</div>}
                   <div style={{ display:"flex",gap:12,marginBottom:14 }}>
                     <div style={{ fontSize:18,fontWeight:900,color:"#ffe600" }}>+{chosenQuest.xp} QXP</div>
-                    <div style={{ fontSize:18,fontWeight:900,color:"#00ff88" }}>+{Math.floor(chosenQuest.xp/10)}₹</div>
                   </div>
                   {!pathRevealed?(
                     <button onClick={()=>setPathRevealed(true)} style={{ width:"100%",padding:"9px",background:"#111",border:"1px solid #1a1a1a",color:"#444",borderRadius:8,fontSize:11,fontWeight:900,letterSpacing:2,cursor:"pointer",marginBottom:10 }}>REVEAL WHAT YOU DODGED →</button>
@@ -856,6 +913,9 @@ function App() {
                 <div style={{ width:36,height:36,borderRadius:"50%",background:"#1a1a1a",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:900,color:"#444",flexShrink:0 }}>{f.avatar}</div>
                 <div style={{ flex:1 }}>
                   <div style={{ fontSize:13,fontWeight:900 }}>@{f.user} <span style={{ fontSize:10,color:"#333",letterSpacing:1 }}>PATH {f.path}</span></div>
+                  <div style={{ fontSize:12,color:"#555",marginTop:3 }}>{f.title}</div>
+                  {!!f.xp&&<div style={{ fontSize:10,color:"#444",letterSpacing:1,marginTop:3 }}>+{f.xp} XP {f.streak?`- ${f.streak}D STREAK`:""}</div>}
+                  {!f.xp&&f.status==="bypassed"&&<div style={{ fontSize:10,color:"#444",letterSpacing:1,marginTop:3 }}>BYPASSED WITH AD</div>}
                   {f.verified&&<span style={{ fontSize:10,fontWeight:900,background:"#003319",color:"#00ff88",padding:"1px 7px",borderRadius:4 }}>VERIFIED</span>}
                   <div style={{ fontSize:11,color:"#222",marginTop:2 }}>{f.time}</div>
                 </div>
@@ -887,8 +947,8 @@ function App() {
               ))}
             </div>
             {[(lbTab==="completers"
-              ? {rank:1,user:"you",val:profile.questXP,sub:`${profile.streak}D STREAK`,isMe:true}
-              : {rank:1,user:"you",val:profile.makerXP,sub:`${candidates.filter(c=>c.isMe).length} QUESTS`,isMe:true}
+              ? {rank:1,user:"you",val:profile.questXP,sub:`${profile.completedQuests} COMPLETED - ${profile.streak}D STREAK`,isMe:true}
+              : {rank:1,user:"you",val:profile.skippedQuests,sub:`${recentSkipUses.length}/2 BYPASSES USED`,isMe:true}
             )].map(u=>(
               <div key={u.rank} style={{ background:u.isMe?"#0a0d0f":"#0d0d0d",border:u.isMe?"1px solid #ffffff11":"1px solid #1a1a1a",borderRadius:10,padding:"0.9rem 1.1rem",marginBottom:8,display:"flex",alignItems:"center",gap:12 }}>
                 <div style={{ width:22,fontSize:14,fontWeight:900,color:u.rank===1?"#ffe600":"#222",textAlign:"center" }}>{u.rank}</div>
