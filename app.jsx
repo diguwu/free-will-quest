@@ -145,37 +145,6 @@ function BadgeShelf({ earned }) {
 }
 
 // ── SCRATCH CARD ──────────────────────────────────────────────────────────
-function ScratchReveal({ quest, onReveal }) {
-  const ref=useRef(); const sc=useRef(0); const [revealed,setRevealed]=useState(false);
-  useEffect(()=>{
-    const c=ref.current,ctx=c.getContext("2d");
-    c.width=c.offsetWidth; c.height=c.offsetHeight;
-    ctx.fillStyle="#1a1a1a"; ctx.fillRect(0,0,c.width,c.height);
-    ctx.fillStyle="#444"; ctx.font="bold 13px monospace"; ctx.textAlign="center";
-    ctx.fillText("SCRATCH TO REVEAL YOUR FATE",c.width/2,c.height/2-8);
-    ctx.fillText("▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓",c.width/2,c.height/2+14);
-  },[]);
-  const scratch=(e)=>{
-    if(revealed)return;
-    const c=ref.current,ctx=c.getContext("2d"),rect=c.getBoundingClientRect();
-    const x=(e.touches?e.touches[0].clientX:e.clientX)-rect.left;
-    const y=(e.touches?e.touches[0].clientY:e.clientY)-rect.top;
-    ctx.globalCompositeOperation="destination-out";
-    ctx.beginPath(); ctx.arc(x*(c.width/rect.width),y*(c.height/rect.height),28,0,Math.PI*2); ctx.fill();
-    sc.current+=1;
-    if(sc.current>18){setRevealed(true);onReveal();}
-  };
-  return (
-    <div style={{ position:"relative",borderRadius:12,overflow:"hidden",marginBottom:16,height:90 }}>
-      <div style={{ position:"absolute",inset:0,background:"#0d0d0d",border:"1px solid #333",borderRadius:12,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center" }}>
-        <div style={{ fontSize:18,fontWeight:900,color:"#ff3c3c",letterSpacing:-1,textTransform:"uppercase" }}>{quest.title}</div>
-        <div style={{ fontSize:12,color:"#888",marginTop:4 }}>PATH {quest.path} · +{quest.xp} XP</div>
-      </div>
-      <canvas ref={ref} onMouseMove={e=>e.buttons&&scratch(e)} onMouseDown={scratch} onTouchMove={scratch} onTouchStart={scratch} style={{ position:"absolute",inset:0,width:"100%",height:"100%",cursor:"crosshair",borderRadius:12,touchAction:"none" }} />
-    </div>
-  );
-}
-
 // ── AD INTERSTITIAL ───────────────────────────────────────────────────────
 function AdInterstitial({ onDone }) {
   const [secs,setSecs]=useState(5);
@@ -333,7 +302,6 @@ function ReboundSheet({ profile, setProfile, onClose, rebound }) {
 
 // ── ONBOARDING ────────────────────────────────────────────────────────────
 const SLIDES = [
-  { emoji:"🎲", title:"TWO PATHS.\nONE DARE.", body:"Every day, two quests. You scratch to reveal them. You pick one. You do it in real life." },
   { emoji:"📸", title:"PROOF OR\nIT DIDN'T HAPPEN.", body:"Upload a photo. AI judges whether you actually did it. No cheating. No mercy." },
   { emoji:"🔥", title:"SHOW UP.\nOR LOSE IT ALL.", body:"Miss a day, your streak dies. Keep going and earn badges nobody else has." },
 ];
@@ -510,7 +478,6 @@ function App() {
   const [tab,setTab]=useState("quest");
   const [phase,setPhase]=useState(()=>loadProfile().activeQuestStatus||"blind");
   const [chosenQuest,setChosenQuest]=useState(()=>QUESTS.find(q=>q.id===loadProfile().activeQuestId)||null);
-  const [scratchDone,setScratchDone]=useState([false,false]);
   const [preview,setPreview]=useState(null);
   const [aiResult,setAiResult]=useState(null);
   const [roast,setRoast]=useState(null);
@@ -650,7 +617,6 @@ function App() {
     } catch {} setGeneratingAI(false);
   };
 
-  const reset=()=>{ setPreview(null);setAiResult(null);setRoast(null);setScratchDone([false,false]);setDiffVote(null);setPathRevealed(false);syncQuestState(null,"blind"); };
   const retakeUpload=()=>{ setPreview(null);setAiResult(null);setRoast(null);syncQuestState(chosenQuest,"chosen"); };
   const bypassQuest=()=>{
     if(!chosenQuest||!skipCanUse)return;
@@ -738,20 +704,20 @@ function App() {
             {phase==="blind"&&(
               <div style={{ background:"#0d0d0d",border:"1px solid #1a1a1a",borderRadius:12,padding:"1.25rem" }}>
                 <div style={{ fontSize:11,fontWeight:900,letterSpacing:3,color:ACCENT_COLOR,marginBottom:8 }}>TODAY'S DARE — PICK YOUR PATH</div>
-                <div style={{ fontSize:13,color:"#444",marginBottom:14,lineHeight:1.5 }}>Two quests. Scratch to reveal. You only do one.</div>
-                {QUESTS.map((q,i)=>(
-                  <ScratchReveal key={q.id} quest={q} onReveal={()=>{const n=[...scratchDone];n[i]=true;setScratchDone(n);}} />
-                ))}
-                {scratchDone.some(Boolean)&&(
-                  <div style={{ marginTop:14 }}>
-                    <div style={{ fontSize:11,fontWeight:900,letterSpacing:2,color:"#444",marginBottom:10 }}>WHICH ONE?</div>
-                    <div style={{ display:"flex",gap:8 }}>
-                      {QUESTS.map(q=>(
-                        <button key={q.id} onClick={()=>syncQuestState(q,"chosen")} style={{ flex:1,padding:"12px",background:"#111",border:"1px solid #2a2a2a",borderRadius:8,color:"#fff",fontSize:13,fontWeight:900,cursor:"pointer",letterSpacing:1 }}>PATH {q.path}</button>
-                      ))}
+                <div style={{ fontSize:13,color:"#444",marginBottom:14,lineHeight:1.5 }}>Two quests. Pick one. Finish it or bypass it.</div>
+                {QUESTS.map(q=>(
+                  <button key={q.id} onClick={()=>syncQuestState(q,"chosen")} style={{ width:"100%",textAlign:"left",background:"#0a0a0a",border:"1px solid #1f1f1f",borderRadius:12,padding:"1rem 1rem",marginBottom:10,cursor:"pointer" }}>
+                    <div style={{ display:"flex",justifyContent:"space-between",gap:10,marginBottom:6 }}>
+                      <div style={{ fontSize:16,fontWeight:900,color:"#fff",textTransform:"uppercase" }}>{q.title}</div>
+                      <div style={{ fontSize:11,fontWeight:900,color:ACCENT_COLOR,letterSpacing:1 }}>PATH {q.path}</div>
                     </div>
-                  </div>
-                )}
+                    <div style={{ fontSize:13,color:"#666",lineHeight:1.5,marginBottom:8 }}>{q.desc}</div>
+                    <div style={{ display:"flex",gap:10 }}>
+                      <span style={{ fontSize:11,fontWeight:900,color:"#ffe600",letterSpacing:2 }}>+{q.xp} XP</span>
+                      <span style={{ fontSize:11,color:"#333",letterSpacing:1 }}>{q.diff.toUpperCase()}</span>
+                    </div>
+                  </button>
+                ))}
               </div>
             )}
 
@@ -998,3 +964,4 @@ function App() {
 // Render the app
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(<App />);
+
