@@ -610,7 +610,14 @@ function App() {
   };
 
   const reset=()=>{ setPhase("blind");setChosenQuest(null);setPreview(null);setAiResult(null);setRoast(null);setScratchDone([false,false]);setDiffVote(null);setPathRevealed(false); };
-  const verifyWithAI=()=>{ setShowAd(true); };
+  const verifyWithAI=()=>{ 
+    // Submit to admin review queue instead of AI
+    const submission={id:Date.now(),questTitle:chosenQuest.title,photoBase64:preview,status:"pending",timestamp:Date.now()};
+    const updated=[...pendingSubmissions,submission];
+    setPendingSubmissions(updated);
+    localStorage.setItem(PENDING_SUBMISSIONS_KEY,JSON.stringify(updated));
+    setPhase("submitted");
+  };
   const tabs=adminAuthenticated?[{id:"quest",label:"TODAY"},{id:"lab",label:"LAB"},{id:"community",label:"FEED"},{id:"leaderboard",label:"RANKS"},{id:"admin",label:"ADMIN"}]:[{id:"quest",label:"TODAY"},{id:"lab",label:"LAB"},{id:"community",label:"FEED"},{id:"leaderboard",label:"RANKS"}];
 
   if(!onboarded) return <Onboarding onDone={()=>setOnboarded(true)} />;
@@ -725,7 +732,7 @@ function App() {
                   <button onClick={reset} style={{ flex:1,padding:"11px",background:"#111",border:"1px solid #222",color:"#666",borderRadius:8,fontSize:12,fontWeight:900,letterSpacing:2,cursor:"pointer" }}>RETAKE</button>
                   <button onClick={verifyWithAI} style={{ flex:2,padding:"11px",background:WEEK_THEME.color,border:"none",color:"#fff",borderRadius:8,fontSize:13,fontWeight:900,letterSpacing:2,cursor:"pointer" }}>VERIFY →</button>
                 </div>
-                <div style={{ marginTop:8,fontSize:10,color:"#1a1a1a",textAlign:"center",letterSpacing:1 }}>SHORT AD PLAYS BEFORE RESULT</div>
+                <div style={{ marginTop:8,fontSize:10,color:"#1a1a1a",textAlign:"center",letterSpacing:1 }}>ADMIN WILL REVIEW YOUR SUBMISSION</div>
               </div>
             )}
 
