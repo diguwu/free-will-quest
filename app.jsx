@@ -610,6 +610,7 @@ function App() {
   };
 
   const reset=()=>{ setPhase("blind");setChosenQuest(null);setPreview(null);setAiResult(null);setRoast(null);setScratchDone([false,false]);setDiffVote(null);setPathRevealed(false); };
+  const verifyWithAI=()=>{ setShowAd(true); };
   const tabs=adminAuthenticated?[{id:"quest",label:"TODAY"},{id:"lab",label:"LAB"},{id:"community",label:"FEED"},{id:"leaderboard",label:"RANKS"},{id:"admin",label:"ADMIN"}]:[{id:"quest",label:"TODAY"},{id:"lab",label:"LAB"},{id:"community",label:"FEED"},{id:"leaderboard",label:"RANKS"}];
 
   if(!onboarded) return <Onboarding onDone={()=>setOnboarded(true)} />;
